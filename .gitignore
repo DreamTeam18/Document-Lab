@@ -1,0 +1,40 @@
+.env
+.env.*
+!.env.example
+.venv/
+.local/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.vercel/
+*.log
+data/
+.DS_Store
+
+
+# React frontend build artifacts
+web/node_modules/
+web/.next/
+web/*.tsbuildinfo
+web/.test-results/
+
+# Credentials, local certificates, and database backups
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.dump
+*.backup
+.pgpass
+.npmrc
+.pypirc
+credentials.json
+service-account*.json
+
+# Generated test output
+.coverage
+htmlcov/
+coverage/
+playwright-report/
+test-results/

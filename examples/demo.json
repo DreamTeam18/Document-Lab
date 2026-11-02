@@ -1,0 +1,12 @@
+{
+  "id": "d00d0000-0000-4000-8000-000000000001",
+  "title": "Fictional demo manual — not a building code",
+  "edition": "demo-v1",
+  "sections": [
+    {"id": "1", "number": "1", "title": "Document handling", "page": 1,
+     "text": "This fictional manual explains document handling. Section 1.1 describes archive labels."},
+    {"id": "1.1", "number": "1.1", "title": "Archive labels", "parent_id": "1", "page": 1,
+     "text": "Each archive label must include the document title and edition. The demo label color is blue.",
+     "references": ["1"]}
+  ]
+}

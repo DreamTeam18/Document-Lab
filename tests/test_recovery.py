@@ -38,9 +38,11 @@ class FlakyProvider:
         if self.failures.get(stage, 0):
             self.failures[stage] -= 1
             raise ProviderError("private-provider-body", retryable=True)
-        return {"plan": '{"queries":["q"]}', "assess": '{"sufficient":true}', "answer": "Blue [1]"}[
-            stage
-        ]
+        return {
+            "plan": '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
+            "assess": '{"sufficient":true}',
+            "answer": "Blue [1]",
+        }[stage]
 
     async def embed(self, query):
         return [1.0] * 768
@@ -83,18 +85,19 @@ async def test_retry_allowance_is_shared_across_nodes_and_exhaustion_is_terminal
     assert "private-provider-body" not in json.dumps(final, default=str)
 
 
-async def test_persistent_transient_failure_has_three_total_attempts():
+async def test_planner_exhausts_three_attempts_then_uses_original_question():
     provider = FlakyProvider({"plan": 100})
     final, stages, _ = await run(Workflow(provider, FakeSearch([])))
-    assert provider.calls == ["plan"] * 3
-    assert stages == ["triage"] + ["plan", "error_handler"] * 3
-    assert final["status"] == "failed"
+    assert provider.calls == ["plan"] * 3 + ["assess"]
+    assert stages == ["triage"] + ["plan", "error_handler"] * 3 + ["retrieve", "assess", "answer"]
+    assert final["status"] == "succeeded"
+    assert final["plan_fallback"] and final["searches"] == ["q"]
 
 
 @pytest.mark.parametrize("stage", ["retrieve", "refine"])
 async def test_storage_transient_failure_routes_back_to_same_research_stage(stage):
     replies = [
-        '{"queries":["q"]}',
+        '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
         '{"sufficient":false,"query":"refined"}' if stage == "refine" else '{"sufficient":true}',
         "Blue [1]",
     ]
@@ -138,7 +141,12 @@ async def test_nontransient_storage_failures_are_sanitized_and_not_retried(failu
     "reply", ["broken json", "{}", '{"sufficient":"true"}', '{"sufficient":false}']
 )
 async def test_malformed_assessment_fails_without_synthesis(reply):
-    provider = FakeProvider(['{"queries":["q"]}', reply])
+    provider = FakeProvider(
+        [
+            '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
+            reply,
+        ]
+    )
     final, stages, _ = await run(Workflow(provider, FakeSearch([hit()])))
     assert final["status"] == "failed"
     assert provider.calls == 2
@@ -297,7 +305,7 @@ def test_api_terminal_status_controls_single_persistence_attempt(monkeypatch, mo
                 raise ProviderError("secret provider body", retryable=True)
             yield "[1]"
 
-    provider = Provider({"plan": 10 if mode == "exhausted" else 1})
+    provider = Provider({"plan": 1, **({"assess": 10} if mode == "exhausted" else {})})
     store = Store()
     monkeypatch.setenv("DATABASE_URL", "")
     settings.cache_clear()
@@ -320,7 +328,7 @@ def test_api_terminal_status_controls_single_persistence_attempt(monkeypatch, mo
             assert not store.saved
             assert store.writes == (1 if mode in {"conflict", "sql"} else 0)
         assert provider.stream_calls == (0 if mode == "exhausted" else 1)
-        assert provider.calls.count("plan") == (3 if mode == "exhausted" else 2)
+        assert provider.calls.count("plan") == 2
     finally:
         app.dependency_overrides.clear()
         settings.cache_clear()

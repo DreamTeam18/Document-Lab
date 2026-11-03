@@ -76,7 +76,12 @@ class StreamingProvider(FakeProvider):
 
 
 async def test_workflow_emits_tokens_before_validated_final_update():
-    provider = StreamingProvider(['{"queries":["q"]}', '{"sufficient":true}'])
+    provider = StreamingProvider(
+        [
+            '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
+            '{"sufficient":true}',
+        ]
+    )
     workflow = Workflow(provider, FakeSearch([hit()]), stream_answer=True)
     events = [
         event
@@ -117,7 +122,12 @@ def test_api_streams_tokens_and_only_persists_completed_answer(monkeypatch, fail
     app.dependency_overrides[storage] = lambda: store
     try:
         with TestClient(app) as client:
-            app.state.providers = Provider(['{"queries":["q"]}', '{"sufficient":true}'])
+            app.state.providers = Provider(
+                [
+                    '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
+                    '{"sufficient":true}',
+                ]
+            )
             response = client.post(
                 "/query", json={"user_query": "q", "document_ids": [str(uuid4())]}
             )

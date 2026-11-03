@@ -102,7 +102,12 @@ def test_no_token_required_and_stream_persistence(monkeypatch):
             assert client.get("/documents").json() == []
             assert client.get(f"/conversations/{uuid4()}/messages").json() == []
             assert "securitySchemes" not in client.get("/openapi.json").json()["components"]
-            app.state.providers = FakeProvider(['{"queries":["missing"]}', '{"sufficient":true}'])
+            app.state.providers = FakeProvider(
+                [
+                    '{"sub_questions":[{"id":"q1","question":"missing","objective":"Find supporting evidence","dependencies":[]}]}',
+                    '{"sufficient":true}',
+                ]
+            )
             response = client.post(
                 "/query",
                 json={"user_query": "missing", "document_ids": [str(uuid4())]},

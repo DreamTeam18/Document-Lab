@@ -131,7 +131,7 @@ class FakeSearch:
 async def test_workflow_refines_once_and_falls_back_when_embeddings_fail():
     provider = FakeProvider(
         [
-            '{"queries":["labels"]}',
+            '{"sub_questions":[{"id":"q1","question":"labels","objective":"Find supporting evidence","dependencies":[]}]}',
             '{"sufficient":false,"query":"label colors"}',
             "Labels must be blue [1].",
         ],

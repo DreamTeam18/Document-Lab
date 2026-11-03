@@ -49,8 +49,25 @@ def agent(name, provider, storage):
 @pytest.mark.parametrize(
     "name,reply,keys",
     [
-        ("plan", '{"queries":["blue labels"]}', {"searches", "warnings"}),
-        ("retrieve", "", {"hits", "context", "sources", "warnings"}),
+        (
+            "plan",
+            '{"sub_questions":[{"id":"q1","question":"blue labels","objective":"Find supporting evidence","dependencies":[]}]}',
+            {"searches", "warnings", "research_plan", "plan_size", "plan_fallback"},
+        ),
+        (
+            "retrieve",
+            "",
+            {
+                "hits",
+                "context",
+                "sources",
+                "warnings",
+                "research_plan",
+                "plan_size",
+                "research_results",
+                "hyde_passages",
+            },
+        ),
         ("assess", '{"sufficient":false,"query":"colors"}', {"retry", "searches"}),
         ("refine", "", {"context", "sources", "warnings"}),
         ("answer", "Blue [1]", {"answer", "citations"}),
@@ -80,7 +97,11 @@ async def test_agents_return_patches_without_mutating_input(name, reply, keys):
 @pytest.mark.parametrize("name", ["plan", "retrieve", "assess", "refine", "answer"])
 @pytest.mark.parametrize("error_type", [ProviderError, asyncio.CancelledError])
 async def test_failure_and_cancellation_propagate_unchanged(name, error_type):
-    error = error_type("injected failure")
+    error = (
+        ProviderError("injected failure", retryable=True)
+        if error_type is ProviderError
+        else error_type("injected failure")
+    )
 
     class FailingProvider:
         async def chat(self, *args):
@@ -110,7 +131,10 @@ async def test_embedding_fallback_preserves_document_scope():
     service = SearchService(FakeProvider([], fail_embedding=True), ScopedStorage())
     result = await RetrievalAgent(service)(original)
     assert calls == [("labels", original["document_ids"], None)]
-    assert result["warnings"] == ["Embedding service unavailable; used exact/full-text retrieval."]
+    assert result["warnings"] == [
+        "earlier warning",
+        "Embedding service unavailable; used exact/full-text retrieval.",
+    ]
     assert original["warnings"] == ["earlier warning"]
 
 
@@ -140,7 +164,18 @@ async def test_shared_workflow_isolates_concurrent_state_sources_and_tokens(stre
             if system.startswith("Classify document"):
                 return json.dumps({"route": "complex_research", "rewritten_question": color})
             if "plan document" in system:
-                return json.dumps({"queries": [color]})
+                return json.dumps(
+                    {
+                        "sub_questions": [
+                            {
+                                "id": "q1",
+                                "question": color,
+                                "objective": "Find color",
+                                "dependencies": [],
+                            }
+                        ]
+                    }
+                )
             if "Check whether" in system:
                 return '{"sufficient":true}'
             return color + " [1]"

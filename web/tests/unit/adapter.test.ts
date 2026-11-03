@@ -48,4 +48,4 @@ it('reports a truncated stream after displaying partial tokens',async()=>{
  await expect(iterator.next()).rejects.toThrow('before an answer');
 });
 
-it.each([['triage','Request routed'],['conversational','Response prepared']])('labels %s progress without exposing classifier details',async(step,label)=>{mock(frame('progress',{step,status:'completed'})+frame('result',{answer:'Hello',citations:[]}));const events=await run();expect(events[0]).toMatchObject({type:'step',step:{id:step,label}});expect(events).toContainEqual({type:'text',delta:'Hello'});});
+it.each([['triage','Request routed'],['conversational','Response prepared'],['hyde','Retrieval hints prepared']])('labels %s progress without exposing classifier details',async(step,label)=>{mock(frame('progress',{step,status:'completed'})+frame('result',{answer:'Hello',citations:[]}));const events=await run();expect(events[0]).toMatchObject({type:'step',step:{id:step,label}});expect(events).toContainEqual({type:'text',delta:'Hello'});});

@@ -18,7 +18,9 @@ PostgreSQL vector copies remain for rollback.
 HTTP client
   -> FastAPI POST /query (SSE progress + final answer)
   -> PostgreSQL: selected documents + last 0–4 exchanges, capped at 6,000 characters
-  -> LangGraph: plan -> retrieve -> assess -> optional refinement -> answer
+  -> LangGraph: triage -> structured plan or direct retrieval -> assess -> optional refinement -> answer
+       -> fixed conversational response for supported greetings/help
+       -> bounded error-handler recovery
        -> OpenRouter chat (default: openrouter/free)
        -> OpenRouter embeddings (same API key)
        -> Pinecone: semantic vector search
@@ -30,11 +32,12 @@ Local normalized JSON / sample graph export
   -> local ingestion -> embeddings -> PostgreSQL transaction
 ```
 
-A successful first attempt uses at most four chat-generation calls and three
-embedding calls (two planned searches plus one refinement). Recovery allows at
-most two extra stage attempts across the request: upper bounds are six chat
-calls or seven embedding calls, depending on which stages fail. All attempts
-share the original request deadline; answer generation is never replayed.
+A successful first attempt uses at most four chat-generation calls and
+MAX_SUB_QUESTIONS + 1 embedding calls (planned questions plus one refinement).
+Recovery allows at most two extra stage attempts. Separate request-wide caps
+(default six chat calls and thirteen embedding calls) count attempted calls,
+including failures and streaming generation, before calling providers. All
+attempts share the original deadline; answer generation is never replayed.
 Embedding outages fall back to full-text and exact lookup, with a warning in the
 response. Empty evidence produces an abstention. Citation IDs are checked against
 retrieved sources; this does not prove factual correctness of every claim.
@@ -326,7 +329,9 @@ two additional attempts with 0.25s/0.5s backoff and its original chat deadline.
 Authentication/configuration errors, malformed provider responses, SQL failures
 and unexpected internal failures terminate without retry. Malformed assessment
 output fails explicitly instead of silently treating evidence as sufficient.
-Malformed plans retain the original single-question fallback; embedding failures
+Malformed or non-transiently failed plans retain the original single-question
+fallback; exhausted transient planner retries also fall back if time remains. Budget
+or deadline exhaustion is terminal. Embedding failures
 retain exact/full-text retrieval with a warning.
 
 Answer generation is never replayed, even before the first token. Failed graphs
@@ -361,3 +366,59 @@ complex research; it is not a universal latency improvement. Direct conversation
 responses emit progress and a final result without token events. Research answers
 retain live token streaming. `tests/test_triage.py` covers routes, call counts,
 unsafe classifications, history bounds, recovery and API persistence.
+
+## Structured research plans
+
+`MAX_SUB_QUESTIONS` defaults to 2 and accepts 1–4. Plans contain stable IDs,
+standalone questions, objectives, dependencies and the server-selected document
+scope. Local validation rejects unknown fields, missing references, duplicate IDs,
+cycles, and oversized plans. Duplicate questions are merged and dependency IDs
+remapped. IDs are assigned deterministically after dependency ordering. Invalid
+plans fall back to a single original-question plan, never a truncated partial plan.
+
+Retrieval runs the questions sequentially in dependency order and retains results
+by sub-question ID. Dependencies control retrieval order; they do not execute
+calculations or dynamically substitute previous answers. Assessment and synthesis
+still operate on combined evidence; per-question assessment is ticket #6.
+
+`CHAT_CALL_LIMIT` (default 6, range 1–12) and `EMBEDDING_CALL_LIMIT` (default 13,
+range 1–24) apply across triage, planning, retrieval, refinement, generation and
+recovery. Counts represent attempted provider calls, not tokens or billed cost.
+Budget exhaustion emits an error and never saves a successful turn. Successful
+SSE results include `plan_size` and `usage` (counts and configured limits); terminal
+graph errors include usage. Concurrent requests have separate counters.
+
+Planning tests use reviewed synthetic question shapes and deterministic responses;
+these verify contracts and limits, not live model decomposition quality.
+Run `uv run pytest -q tests/test_planning.py` for focused validation.
+
+## Optional HyDE retrieval (experimental)
+
+`HYDE_ENABLED=false` by default. Enable it in the backend environment and restart
+to add a `hyde` node after structured planning. Direct retrieval routes and
+section/table/chapter-reference plan items bypass hypothetical generation.
+Each eligible planned question receives at most one JSON hypothetical passage,
+limited to 300 output tokens and 2,000 characters. Generation is sequential,
+within the plan size, shared call limits and request deadline.
+
+Retrieval always searches the original question first. An optional second search
+embeds the hypothetical passage with the same OpenRouter embedding model and
+passes that vector to existing scoped storage/Pinecone search. The lookup text
+remains the original question, so invented section numbers never drive exact
+lookup. Existing document, active-generation and embedding-signature checks stay
+in place. No reindexing or new database is required.
+
+Original and additional real hits are deduplicated and interleaved, original hit
+first, within the existing evidence limits. Hypothetical text is not citation
+metadata or synthesis evidence, is not persisted, and is cleared after retrieval.
+Provider failures or invalid hypothetical output retain ordinary retrieval.
+Cancellation propagates. HyDE reserves two chat calls for assessment/answering
+and embedding calls for remaining original questions plus refinement; under tight
+budgets some hypothetical searches are skipped with a warning.
+
+Each used hypothesis adds one chat and one embedding call, plus one search.
+Tests compare the same deterministic fixture with HyDE disabled/enabled and verify
+actual vector wiring, isolation and fallbacks. They do not establish semantic
+quality or real-world latency benefit. Before changing the default, run both modes
+on the same reviewed, held-out golden questions and compare retrieval recall,
+answer support, latency and cost. That live quality evaluation remains pending.

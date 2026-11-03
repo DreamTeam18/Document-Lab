@@ -6,11 +6,31 @@ from typing import Literal, Protocol, TypedDict
 
 class Failure(TypedDict):
     stage: str
-    code: Literal["deadline_exceeded", "provider_failure", "database_failure", "internal_failure"]
+    code: Literal[
+        "deadline_exceeded",
+        "provider_failure",
+        "database_failure",
+        "internal_failure",
+        "budget_exceeded",
+    ]
     retryable: bool
 
 
+class ResearchQuestion(TypedDict):
+    id: str
+    question: str
+    objective: str
+    dependencies: list[str]
+    document_ids: list
+
+
 class State(TypedDict, total=False):
+    hyde_passages: dict[str, str]
+    research_plan: list[ResearchQuestion]
+    research_results: list[dict]
+    plan_size: int
+    plan_fallback: bool
+    usage: dict[str, int]
     status: Literal["running", "recovering", "succeeded", "failed"]
     failure: Failure | None
     deadline: float

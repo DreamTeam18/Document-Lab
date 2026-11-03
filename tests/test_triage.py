@@ -21,7 +21,7 @@ class Provider:
         if system.startswith("Classify document"):
             return self.decision
         if system.startswith("You plan"):
-            return '{"queries":["resolved lookup"]}'
+            return '{"sub_questions":[{"id":"q1","question":"resolved lookup","objective":"Find supporting evidence","dependencies":[]}]}'
         if system.startswith("Check whether"):
             return '{"sufficient":true}'
         return "Blue [1]"

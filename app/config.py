@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=768, ge=768, le=768)
     cors_origin: str = ""
     web_frontend_url: str = "http://localhost:3001"
+    hyde_enabled: bool = False
+    max_sub_questions: int = Field(default=2, ge=1, le=4)
+    chat_call_limit: int = Field(default=6, ge=1, le=12)
+    embedding_call_limit: int = Field(default=13, ge=1, le=24)
     history_exchanges: int = Field(default=4, ge=0, le=4)
     history_max_chars: int = Field(default=6000, ge=0, le=12000)
     upload_timeout_seconds: int = Field(default=1800, ge=1, le=1800)

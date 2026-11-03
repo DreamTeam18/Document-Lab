@@ -127,7 +127,12 @@ def test_stream_failures_do_not_emit_result_or_save_partial_turn(api, mode):
 
     app.state.providers = Broken()
     if mode == "conflict":
-        app.state.providers = FakeProvider(['{"queries":["q"]}', '{"sufficient":true}'])
+        app.state.providers = FakeProvider(
+            [
+                '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
+                '{"sufficient":true}',
+            ]
+        )
 
         async def conflict(*args):
             raise Conflict("Concurrent turn")

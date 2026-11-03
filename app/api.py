@@ -144,6 +144,10 @@ async def query(body: Query, request: Request, store=Depends(storage)):
             store,
             stream_answer=True,
             timeout_seconds=config.request_timeout_seconds,
+            max_sub_questions=config.max_sub_questions,
+            hyde_enabled=config.hyde_enabled,
+            chat_call_limit=config.chat_call_limit,
+            embedding_call_limit=config.embedding_call_limit,
         )
         final = {}
         try:
@@ -179,7 +183,9 @@ async def query(body: Query, request: Request, store=Depends(storage)):
                         if failure.get("code") == "deadline_exceeded"
                         else "Request failed. Please retry or check backend configuration."
                     )
-                    yield event("error", {"message": message})
+                    if failure.get("code") == "budget_exceeded":
+                        message = "Request call budget exhausted; retry with a narrower question."
+                    yield event("error", {"message": message, "usage": final.get("usage", {})})
                     return
                 await store.save_turn(
                     thread_id, version, body.user_query, final["answer"], final["citations"]
@@ -191,6 +197,8 @@ async def query(body: Query, request: Request, store=Depends(storage)):
                         "answer": final["answer"],
                         "citations": final["citations"],
                         "warnings": list(dict.fromkeys(final.get("warnings", []))),
+                        "usage": final.get("usage", {}),
+                        "plan_size": final.get("plan_size", 0),
                     },
                 )
         except TimeoutError:

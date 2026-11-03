@@ -67,6 +67,7 @@ export const chatAdapter: ChatAdapter = {
       triage: "Request routed",
       conversational: "Response prepared",
       plan: "Search planned",
+      hyde: "Retrieval hints prepared",
       retrieve: "Evidence retrieved",
       assess: "Evidence checked",
       refine: "Search refined",

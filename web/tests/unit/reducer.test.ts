@@ -22,11 +22,25 @@ describe('Conversation reducer',()=>{
  it('does not update user message even with matching ID',()=>expect(updateAssistantMessage(thread(),'u',m=>({...m,text:'bad'})).messages[0].text).toBe('Question'));
  it('leaves messages unchanged for missing target',()=>{const t=thread();expect(updateAssistantMessage(t,'missing',m=>({...m,text:'bad'})).messages).toEqual(t.messages)});
  it('completes answer and records duration',()=>{const a=finishAssistantMessage(assistant(),'complete',3);expect(a.status).toBe('complete');expect(a.durationSeconds).toBe(3)});
- it('stopping preserves partial answer and settles steps',()=>{const a=finishAssistantMessage({...assistant(),text:'partial',steps:[step]},'stopped',2);expect(a.text).toBe('partial');expect(a.status).toBe('stopped');expect(a.steps[0].status).toBe('complete')});
+ it('stopping preserves partial answer and settles steps',()=>{const a=finishAssistantMessage({...assistant(),text:'partial',steps:[step]},'stopped',2);expect(a.text).toBe('partial');expect(a.status).toBe('stopped');expect(a.steps[0].status).toBe('stopped')});
  it('error preserves explanation and does not mutate input',()=>{const original={...assistant(),error:'Network'};const result=finishAssistantMessage(original,'error',1);expect(result.error).toBe('Network');expect(result.status).toBe('error');expect(original.status).toBe('streaming')});
 });
 it('replaces provisional tokens with the validated answer without duplication',()=>{
  let t=applyChatEvent(thread(),'a',{type:'text',delta:'Unverified draft'});
  t=applyChatEvent(t,'a',{type:'text-replace',text:'Validated [1]'});
  expect(answer(t).text).toBe('Validated [1]');
+});
+
+it('preserves failed stages when finishing a response',()=>{
+ const a=finishAssistantMessage({...assistant(),steps:[{...step,status:'failed'}]},'error',1);
+ expect(a.steps[0].status).toBe('failed');
+});
+it('marks unfinished stages failed when the stream errors',()=>{
+ const a=finishAssistantMessage({...assistant(),steps:[step]},'error',1);
+ expect(a.steps[0].status).toBe('failed');
+});
+it('successful retry replaces the failed stage without duplicating it',()=>{
+ let t=applyChatEvent(thread(),'a',{type:'step',step:{...step,status:'failed'}});
+ t=applyChatEvent(t,'a',{type:'step',step:{...step,status:'complete'}});
+ expect(answer(t).steps).toEqual([{...step,status:'complete'}]);
 });

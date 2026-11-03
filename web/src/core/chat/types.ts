@@ -15,7 +15,7 @@ export type ChatStep = {
   id: string;
   kind: ChatStepKind;
   label: string;
-  status: "active" | "complete";
+  status: "active" | "complete" | "failed" | "stopped";
   /** Rendered as small badges under the step, e.g. searched domains. */
   results?: string[];
 };

@@ -61,15 +61,15 @@ export const site = {
       },
       {
         label: "Agentic retrieval",
-        title: "Search, check, refine",
+        title: "Break down complex questions",
         description:
-          "A bounded workflow plans searches and checks whether the retrieved evidence is enough.",
+          "Simple questions go straight to document search. Complex questions can be split into smaller questions, with independent searches running together.",
       },
       {
         label: "Evidence",
         title: "Sources beside answers",
         description:
-          "Document titles, section references, and PDF page numbers keep answers traceable.",
+          "Answers combine evidence across your questions, with document titles, editions, section references, and available page numbers beside citations.",
       },
       {
         label: "Context",
@@ -81,13 +81,13 @@ export const site = {
         label: "Transparency",
         title: "Know the limits",
         description:
-          "When selected documents lack evidence, the app is designed to say so.",
+          "Evidence is checked for each question. A focused follow-up search can fill gaps; unresolved gaps and failed searches are reported.",
       },
       {
         label: "Your workspace",
-        title: "A focused place to think",
+        title: "Follow the answer as it arrives",
         description:
-          "Organize conversations, explore sources, and switch between light and dark themes.",
+          "Watch the answer appear as it is generated. The completed response replaces the draft after its citation references are checked.",
       },
     ],
   },
@@ -99,7 +99,7 @@ export const site = {
   chat: {
     greeting: "What would you like to understand?",
     description:
-      "Select your sources or upload a document. Ask a question, explore the details, and keep the evidence close.",
+      "Upload or select documents, then ask a question or compare details. Follow the search progress, streamed answer, and cited sources.",
     placeholder: "Ask a question about your documents…",
     disclaimer: "Answers can make mistakes. Check the cited sources.",
     surpriseMe: {

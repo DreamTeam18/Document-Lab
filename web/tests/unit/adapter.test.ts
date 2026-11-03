@@ -49,3 +49,21 @@ it('reports a truncated stream after displaying partial tokens',async()=>{
 });
 
 it.each([['triage','Request routed'],['conversational','Response prepared'],['hyde','Retrieval hints prepared']])('labels %s progress without exposing classifier details',async(step,label)=>{mock(frame('progress',{step,status:'completed'})+frame('result',{answer:'Hello',citations:[]}));const events=await run();expect(events[0]).toMatchObject({type:'step',step:{id:step,label}});expect(events).toContainEqual({type:'text',delta:'Hello'});});
+
+it('retains backend failure status instead of showing success',async()=>{
+ mock(frame('progress',{step:'assess',status:'failed'})+frame('result',{answer:'Insufficient evidence'}));
+ expect((await run())[0]).toMatchObject({step:{id:'assess',status:'failed',label:'Evidence checked'}});
+});
+it('labels recovery and preserves reassessment progress',async()=>{
+ mock(frame('progress',{step:'error_handler',status:'completed'})+frame('progress',{step:'assess',status:'completed'})+frame('result',{answer:'Supported [1]'}));
+ const events=await run();
+ expect(events[0]).toMatchObject({step:{label:'Recovery handled'}});
+ expect(events[1]).toMatchObject({step:{id:'assess',status:'complete'}});
+});
+it('keeps global synthesis citations and partial evidence warnings with final replacement',async()=>{
+ const citations=[{citation:2,document_id:'d2',document_title:'Second manual',edition:'v2',number:'3',kind:'section',page:8}];
+ mock(frame('token',{delta:'Unverified [99]'})+frame('result',{answer:'Supported [2]',citations,warnings:['Evidence partial for q2.'],usage:{chat_calls:5},plan_size:2}));
+ const events=await run();
+ expect(events).toContainEqual({type:'text-replace',text:'Supported [2]'});
+ expect(events).toContainEqual({type:'sources',citations,warnings:['Evidence partial for q2.']});
+});

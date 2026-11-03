@@ -68,6 +68,10 @@ export function finishAssistantMessage(
     ...message,
     status,
     durationSeconds,
-    steps: message.steps.map((step) => ({ ...step, status: "complete" })),
+    steps: message.steps.map((step) =>
+      step.status === "active"
+        ? { ...step, status: status === "error" ? "failed" : status === "stopped" ? "stopped" : "complete" }
+        : step,
+    ),
   };
 }

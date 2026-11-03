@@ -24,7 +24,7 @@ const examples = [
     excerpt:
       "Every archive label must include the document title and edition. Labels should be blue.",
     answer:
-      "Include the document title and edition on every archive label. Use blue labels.",
+      "Include the document title and edition on every archive label. The manual recommends blue labels.",
     page: 1,
   },
   {
@@ -34,7 +34,7 @@ const examples = [
     excerpt:
       "Before requesting workspace access, complete orientation and ask your team lead to approve your role.",
     answer:
-      "Complete orientation, then ask your team lead to approve your role. You can request workspace access after both steps.",
+      "Complete orientation and obtain your team lead’s approval before requesting workspace access.",
     page: 8,
   },
   {
@@ -69,7 +69,7 @@ export function RagExamples() {
     <Section
       id="examples"
       title="Watch a question become an answer"
-      subtitle="Three illustrative examples. Every real conversation starts with your own sources."
+      subtitle="Three simplified examples. The app chooses a search path for your question and checks evidence before combining an answer."
     >
       <div ref={ref} className="mx-auto mt-10 max-w-6xl">
         <div
@@ -183,10 +183,10 @@ export function RagExamples() {
                     {
                       [
                         "Ready to explore",
-                        "Planning the search",
+                        "Choosing a search path",
                         "Retrieving matching passages",
-                        "Checking the evidence",
-                        "Answer grounded in sources",
+                        "Checking evidence coverage",
+                        "Answer with source references",
                       ][shown]
                     }
                   </div>
@@ -214,7 +214,7 @@ export function RagExamples() {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-6 py-4 text-xs text-muted-foreground">
             <span>
-              Scripted illustration using fictional excerpts · no model calls
+              Simplified workflow · scripted illustration using fictional excerpts · no model calls
             </span>
             <Link
               href="/workspace"

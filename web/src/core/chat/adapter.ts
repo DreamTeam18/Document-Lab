@@ -72,6 +72,7 @@ export const chatAdapter: ChatAdapter = {
       assess: "Evidence checked",
       refine: "Search refined",
       answer: "Answer prepared",
+      error_handler: "Recovery handled",
     };
     for await (const { event, data } of parseSSE(response.body)) {
       if (event === "session")
@@ -83,7 +84,7 @@ export const chatAdapter: ChatAdapter = {
             id: data.step,
             kind: "search",
             label: labels[data.step] || data.step,
-            status: "complete",
+            status: data.status === "failed" ? "failed" : "complete",
           },
         };
       if (event === "token" && typeof data.delta === "string") {

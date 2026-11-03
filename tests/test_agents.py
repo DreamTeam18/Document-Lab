@@ -17,7 +17,7 @@ from app.agents import (
 from app.agents.evidence import prepare_evidence
 from app.providers import ProviderError
 from app.workflow import Workflow
-from tests.test_core import FakeProvider, FakeSearch, hit
+from tests.test_core import FakeProvider, FakeSearch, assessment_fixture, hit
 
 
 def state():
@@ -68,8 +68,24 @@ def agent(name, provider, storage):
                 "hyde_passages",
             },
         ),
-        ("assess", '{"sufficient":false,"query":"colors"}', {"retry", "searches"}),
-        ("refine", "", {"context", "sources", "warnings"}),
+        (
+            "assess",
+            '{"sufficient":false,"query":"colors"}',
+            {
+                "retry",
+                "searches",
+                "assessments",
+                "refinement_target",
+                "warnings",
+                "context",
+                "sources",
+            },
+        ),
+        (
+            "refine",
+            "",
+            {"context", "sources", "warnings", "hits", "research_results", "refinement_attempts"},
+        ),
         ("answer", "Blue [1]", {"answer", "citations"}),
     ],
 )
@@ -177,7 +193,7 @@ async def test_shared_workflow_isolates_concurrent_state_sources_and_tokens(stre
                     }
                 )
             if "Check whether" in system:
-                return '{"sufficient":true}'
+                return assessment_fixture('{"sufficient":true}', prompt)
             return color + " [1]"
 
         async def embed(self, query):

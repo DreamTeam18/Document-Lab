@@ -11,7 +11,7 @@ from app.agents.planning import PlanningAgent, normalize_plan
 from app.config import Settings
 from app.providers import ProviderError
 from app.workflow import Workflow
-from tests.test_core import FakeProvider, FakeSearch, hit
+from tests.test_core import FakeProvider, FakeSearch, assessment_fixture, hit
 
 
 def item(id="a", question="What is the policy?", dependencies=None):
@@ -170,7 +170,7 @@ class ResearchProvider:
         if system.startswith("You plan"):
             return self.plan
         if system.startswith("Check"):
-            return '{"sufficient":true}'
+            return assessment_fixture('{"sufficient":true}', args[0])
         return "Blue [1]"
 
     async def embed(self, text):
@@ -268,7 +268,7 @@ def test_api_exposes_usage_and_does_not_save_exhausted_requests(monkeypatch, lim
 
     class Store(FakeStorage):
         async def search(self, *args):
-            return [hit()]
+            return [{**hit(), "document_id": args[1][0]}]
 
     class Provider(ResearchProvider):
         async def stream_chat(self, *args):

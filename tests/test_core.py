@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 import pytest
@@ -102,6 +103,35 @@ def test_graph_converter_preserves_table_and_reference():
     assert doc.sections[2].references == ["t"]
 
 
+def assessment_fixture(reply, prompt):
+    """Translate legacy scenario fixtures to the current per-question evaluator wire format."""
+    try:
+        decision = json.loads(reply)
+    except ValueError:
+        return reply
+    if not isinstance(decision, dict) or not isinstance(decision.get("sufficient"), bool):
+        return reply
+    if decision["sufficient"] is False and not decision.get("query"):
+        return reply
+    data = json.loads(prompt)
+    return json.dumps(
+        {
+            "assessments": [
+                {
+                    "sub_question_id": item["id"],
+                    "status": "sufficient" if decision["sufficient"] else "partial",
+                    "evidence_ids": [entry["id"] for entry in item["evidence"]],
+                    "missing_information": []
+                    if decision["sufficient"]
+                    else ["Coverage incomplete"],
+                    "query": decision.get("query", ""),
+                }
+                for item in data["sub_questions"]
+            ]
+        }
+    )
+
+
 class FakeProvider:
     def __init__(self, replies, fail_embedding=False):
         self.replies, self.calls = iter(replies), 0
@@ -111,7 +141,8 @@ class FakeProvider:
         if args[0].startswith("Classify document"):
             return '{"route":"complex_research","rewritten_question":"q"}'
         self.calls += 1
-        return next(self.replies)
+        reply = next(self.replies)
+        return assessment_fixture(reply, args[1]) if args[0].startswith("Check") else reply
 
     async def embed(self, *args, **kwargs):
         if self.fail_embedding:
@@ -125,6 +156,8 @@ class FakeSearch:
 
     async def search(self, query, docs, embedding):
         self.calls.append((query, embedding))
+        if docs:
+            self.hits = [{**h, "document_id": docs[0]} for h in self.hits]
         return self.hits
 
 
@@ -133,6 +166,7 @@ async def test_workflow_refines_once_and_falls_back_when_embeddings_fail():
         [
             '{"sub_questions":[{"id":"q1","question":"labels","objective":"Find supporting evidence","dependencies":[]}]}',
             '{"sufficient":false,"query":"label colors"}',
+            '{"sufficient":true}',
             "Labels must be blue [1].",
         ],
         fail_embedding=True,
@@ -143,7 +177,7 @@ async def test_workflow_refines_once_and_falls_back_when_embeddings_fail():
     )
     assert len(store.calls) == 2
     assert all(embedding is None for _, embedding in store.calls)
-    assert provider.calls == 3
+    assert provider.calls == 4
     assert result["citations"][0]["citation"] == 1
     assert result["warnings"]
 
@@ -156,4 +190,4 @@ async def test_empty_retrieval_abstains_without_synthesis_call():
     )
     assert result["citations"] == []
     assert "could not find" in result["answer"]
-    assert provider.calls == 2
+    assert provider.calls == 1

@@ -86,7 +86,8 @@ async def test_workflow_emits_tokens_before_validated_final_update():
     events = [
         event
         async for event in workflow.graph.astream(
-            {"question": "q", "history": "", "document_ids": []}, stream_mode=["updates", "custom"]
+            {"question": "q", "history": "", "document_ids": [hit()["document_id"]]},
+            stream_mode=["updates", "custom"],
         )
     ]
     tokens = [value["delta"] for mode, value in events if mode == "custom"]
@@ -107,7 +108,7 @@ def test_api_streams_tokens_and_only_persists_completed_answer(monkeypatch, fail
 
     class Store(FakeStorage):
         async def search(self, *args):
-            return [hit()]
+            return [{**hit(), "document_id": args[1][0]}]
 
     class Provider(StreamingProvider):
         async def stream_chat(self, *args):

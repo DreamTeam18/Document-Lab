@@ -328,7 +328,8 @@ can retry triage, planning, retrieval, assessment or refinement. The entire requ
 two additional attempts with 0.25s/0.5s backoff and its original chat deadline.
 Authentication/configuration errors, malformed provider responses, SQL failures
 and unexpected internal failures terminate without retry. Malformed assessment
-output fails explicitly instead of silently treating evidence as sufficient.
+output is marked as an assessment error, with at most one refinement and
+reassessment; it never silently marks evidence sufficient.
 Malformed or non-transiently failed plans retain the original single-question
 fallback; exhausted transient planner retries also fall back if time remains. Budget
 or deadline exhaustion is terminal. Embedding failures
@@ -376,10 +377,10 @@ cycles, and oversized plans. Duplicate questions are merged and dependency IDs
 remapped. IDs are assigned deterministically after dependency ordering. Invalid
 plans fall back to a single original-question plan, never a truncated partial plan.
 
-Retrieval runs the questions sequentially in dependency order and retains results
+Retrieval runs independent questions concurrently in dependency order and retains results
 by sub-question ID. Dependencies control retrieval order; they do not execute
-calculations or dynamically substitute previous answers. Assessment and synthesis
-still operate on combined evidence; per-question assessment is ticket #6.
+calculations or dynamically substitute previous answers. Assessment judges each sub-question separately in a bounded batch call. Synthesis
+uses those judgments to build a shared citation catalog with per-question coverage.
 
 `CHAT_CALL_LIMIT` (default 6, range 1–12) and `EMBEDDING_CALL_LIMIT` (default 13,
 range 1–24) apply across triage, planning, retrieval, refinement, generation and
@@ -422,3 +423,56 @@ actual vector wiring, isolation and fallbacks. They do not establish semantic
 quality or real-world latency benefit. Before changing the default, run both modes
 on the same reviewed, held-out golden questions and compare retrieval recall,
 answer support, latency and cost. That live quality evaluation remains pending.
+
+## Concurrent research
+
+`RESEARCH_CONCURRENCY=2` limits concurrent sub-question workers per request
+(range 1–4). `RESEARCH_SERVICE_CONCURRENCY=2` limits active workers across API
+requests in one backend process (range 1–8). Multiple server processes/instances
+have separate limits; this is not a distributed provider rate limiter. Set the
+request limit to 1 for sequential execution.
+
+Ready questions execute in bounded dependency waves; a dependent question starts
+after its prerequisites finish. Results retain plan order, sub-question IDs, source
+hits, status, warnings and elapsed milliseconds, regardless of completion order.
+Expected provider failures retain independent evidence and block dependent work.
+If all work fails, normal bounded graph recovery applies. Unexpected errors,
+budget exhaustion, disconnects and deadlines cancel and await outstanding workers.
+Optional HyDE embeddings receive deterministic budget allocations before workers
+start. No background work survives a cancelled retrieval node.
+
+Pinecone requests no longer hold PostgreSQL connections while awaiting network I/O.
+Generation IDs are revalidated and document rows share-locked before source
+hydration; a concurrent reindex produces a conflict instead of using stale matches.
+Tests use controlled async delays and mocked SQL/Pinecone boundaries; they do not
+measure real provider throughput. Run `uv run pytest -q tests/test_concurrency.py`
+for concurrency, ordering, partial failure, cancellation, cross-request isolation
+and connection-release checks.
+
+
+### Per-question assessment and final synthesis (#6 and #7)
+
+Assessment returns sufficient, partial, none, or assessment_error for each planned
+question. Supporting chunk IDs must belong to that question's presented evidence.
+Partial judgments must identify gaps. Failed research remains explicit; malformed
+judgments cannot authorize evidence. One targeted refinement and reassessment is
+allowed when the request budget can still reserve answer generation.
+
+The dedicated SynthesisAgent (also exposed as AnsweringAgent for compatibility)
+uses only assessed supporting excerpts, deduplicated by document and chunk.
+Each question receives an equal share of the 18,000-character evidence budget.
+Its coverage packet links question IDs to global citation numbers, missing
+information and context truncation. Editions and conflicting excerpts remain
+distinct. HyDE passages and failed research are never treated as source evidence.
+
+Only final synthesis streams real provider deltas. The final result replaces
+provisional text after citation-reference validation; interrupted generation is
+not replayed or saved. Citation validation checks reference membership, not
+whether every claim is entailed by its source. Deterministic tests verify these
+contracts; reviewed held-out live-model claim-support evaluation is still needed
+before making answer-quality claims.
+
+Run focused checks with:
+```sh
+uv run pytest -q tests/test_assessment.py tests/test_synthesis.py tests/test_streaming.py
+```

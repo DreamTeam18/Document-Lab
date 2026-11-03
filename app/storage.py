@@ -122,6 +122,23 @@ class Storage:
         joins = """FROM rag.chunks c JOIN rag.sections s
             ON (s.document_id, s.id)=(c.document_id, c.section_id)
             JOIN rag.documents d ON d.id=c.document_id"""
+        vector_docs = None
+        vector_ids = None
+        if embedding is not None and self.vectors is not None:
+            async with self.pool.connection() as conn:
+                await conn.execute("SET LOCAL statement_timeout = '15000ms'")
+                cur = await conn.execute(
+                    "SELECT id, vector_generation FROM rag.documents WHERE id=ANY(%s)",
+                    (document_ids,),
+                )
+                vector_docs = await cur.fetchall()
+            if {d["id"] for d in vector_docs} != set(document_ids) or any(
+                not d["vector_generation"] for d in vector_docs
+            ):
+                raise Conflict("Documents must be migrated to Pinecone before semantic search")
+            vector_ids = await self.vectors.query(
+                embedding, [(d["id"], d["vector_generation"]) for d in vector_docs]
+            )
         async with self.pool.connection() as conn:
             await conn.execute("SET LOCAL statement_timeout = '15000ms'")
             hits = []
@@ -132,21 +149,22 @@ class Storage:
                     (document_ids, numbers),
                 )
                 hits = await cur.fetchall()
-            if embedding is not None and self.vectors is not None:
+            if vector_docs is not None:
+                # Revalidate after network I/O and hold a shared row lock through
+                # hydration so a concurrent reindex cannot swap generations.
                 cur = await conn.execute(
-                    "SELECT id, vector_generation FROM rag.documents WHERE id=ANY(%s)",
+                    "SELECT id, vector_generation FROM rag.documents WHERE id=ANY(%s) FOR SHARE",
                     (document_ids,),
                 )
-                docs = await cur.fetchall()
-                if any(not d["vector_generation"] for d in docs):
-                    raise Conflict("Documents must be migrated to Pinecone before semantic search")
-                ids = await self.vectors.query(
-                    embedding, [(d["id"], d["vector_generation"]) for d in docs]
-                )
+                current = await cur.fetchall()
+                if {d["id"]: d["vector_generation"] for d in current} != {
+                    d["id"]: d["vector_generation"] for d in vector_docs
+                }:
+                    raise Conflict("Document index changed during search; retry the request")
                 cur = await conn.execute(
                     f"SELECT {fields} {joins} WHERE c.document_id=ANY(%s) AND c.id=ANY(%s) "
                     "ORDER BY array_position(%s::bigint[], c.id)",
-                    (document_ids, ids, ids),
+                    (document_ids, vector_ids, vector_ids),
                 )
             elif embedding is not None:
                 vector = vector_literal(embedding)

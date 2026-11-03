@@ -10,7 +10,7 @@ from app.agents.hyde import HyDEAgent
 from app.config import Settings
 from app.providers import ProviderError
 from app.workflow import Workflow
-from tests.test_core import hit
+from tests.test_core import assessment_fixture, hit
 
 PASSAGE = "Hypothetical detail NEVER AUTHORITATIVE Section 9999"
 
@@ -54,7 +54,11 @@ class Provider:
                 raise self.failure
             return self.response
         assert PASSAGE not in prompt
-        return '{"sufficient":true}' if system.startswith("Check") else "Actual policy [1]"
+        return (
+            assessment_fixture('{"sufficient":true}', prompt)
+            if system.startswith("Check")
+            else "Actual policy [1]"
+        )
 
     async def embed(self, text):
         self.embedded.append(text)
@@ -74,8 +78,8 @@ class Store:
         if vector[0] == 2:
             if self.fail_hyde:
                 raise ProviderError("unavailable")
-            return [self.additional, self.original]
-        return [self.original]
+            return [{**h, "document_id": ids[0]} for h in [self.additional, self.original]]
+        return [{**self.original, "document_id": ids[0]}]
 
 
 def initial():

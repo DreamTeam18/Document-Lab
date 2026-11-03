@@ -14,9 +14,9 @@ from app.config import Settings
 from app.pinecone import PineconeVectors
 from app.providers import ProviderError, Providers
 from app.workflow import Workflow
-from tests.test_core import FakeProvider, FakeSearch, hit
+from tests.test_core import FakeProvider, FakeSearch, assessment_fixture, hit
 
-INPUT = {"question": "q", "history": "", "document_ids": []}
+INPUT = {"question": "q", "history": "", "document_ids": [__import__("uuid").uuid4()]}
 
 
 class FlakyProvider:
@@ -40,7 +40,9 @@ class FlakyProvider:
             raise ProviderError("private-provider-body", retryable=True)
         return {
             "plan": '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
-            "assess": '{"sufficient":true}',
+            "assess": assessment_fixture('{"sufficient":true}', args[0])
+            if stage == "assess"
+            else "",
             "answer": "Blue [1]",
         }[stage]
 
@@ -88,7 +90,7 @@ async def test_retry_allowance_is_shared_across_nodes_and_exhaustion_is_terminal
 async def test_planner_exhausts_three_attempts_then_uses_original_question():
     provider = FlakyProvider({"plan": 100})
     final, stages, _ = await run(Workflow(provider, FakeSearch([])))
-    assert provider.calls == ["plan"] * 3 + ["assess"]
+    assert provider.calls == ["plan"] * 3
     assert stages == ["triage"] + ["plan", "error_handler"] * 3 + ["retrieve", "assess", "answer"]
     assert final["status"] == "succeeded"
     assert final["plan_fallback"] and final["searches"] == ["q"]
@@ -99,6 +101,7 @@ async def test_storage_transient_failure_routes_back_to_same_research_stage(stag
     replies = [
         '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
         '{"sufficient":false,"query":"refined"}' if stage == "refine" else '{"sufficient":true}',
+        *(['{"sufficient":true}'] if stage == "refine" else []),
         "Blue [1]",
     ]
 
@@ -109,7 +112,7 @@ async def test_storage_transient_failure_routes_back_to_same_research_stage(stag
             if not self.failed and (stage == "retrieve" or query == "refined"):
                 self.failed = True
                 raise ProviderError("pinecone", retryable=True)
-            return [hit()]
+            return [{**hit(), "document_id": args[0][0]}]
 
     final, stages, _ = await run(Workflow(FakeProvider(replies), Store()))
     assert final["status"] == "succeeded"
@@ -140,17 +143,21 @@ async def test_nontransient_storage_failures_are_sanitized_and_not_retried(failu
 @pytest.mark.parametrize(
     "reply", ["broken json", "{}", '{"sufficient":"true"}', '{"sufficient":false}']
 )
-async def test_malformed_assessment_fails_without_synthesis(reply):
+async def test_malformed_assessment_reassesses_once_then_abstains(reply):
     provider = FakeProvider(
         [
             '{"sub_questions":[{"id":"q1","question":"q","objective":"Find supporting evidence","dependencies":[]}]}',
             reply,
+            reply,
         ]
     )
     final, stages, _ = await run(Workflow(provider, FakeSearch([hit()])))
-    assert final["status"] == "failed"
-    assert provider.calls == 2
-    assert stages[-2:] == ["assess", "error_handler"]
+    assert final["status"] == "succeeded"
+    assert final["assessments"][0]["status"] == "assessment_error"
+    assert final["citations"] == []
+    assert final["hits"]  # Useful evidence retained, not promoted to sufficient.
+    assert provider.calls == 3
+    assert stages[-3:] == ["refine", "assess", "answer"]
 
 
 async def test_malformed_plan_retains_bounded_original_question_fallback():
@@ -285,7 +292,7 @@ def test_api_terminal_status_controls_single_persistence_attempt(monkeypatch, mo
         writes = 0
 
         async def search(self, *args):
-            return [hit()]
+            return [{**hit(), "document_id": args[1][0]}]
 
         async def save_turn(self, *args):
             self.writes += 1

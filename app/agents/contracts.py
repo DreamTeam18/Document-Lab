@@ -25,6 +25,9 @@ class ResearchQuestion(TypedDict):
 
 
 class State(TypedDict, total=False):
+    assessments: list[dict]
+    refinement_target: str | None
+    refinement_attempts: int
     hyde_passages: dict[str, str]
     research_plan: list[ResearchQuestion]
     research_results: list[dict]

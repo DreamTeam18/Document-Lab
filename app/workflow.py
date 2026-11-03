@@ -39,6 +39,8 @@ class Workflow:
         timeout_seconds: float = 220,
         max_sub_questions: int = 2,
         hyde_enabled: bool = False,
+        research_concurrency: int = 2,
+        research_limiter=None,
         chat_call_limit: int = 6,
         embedding_call_limit: int = 13,
     ):
@@ -50,7 +52,7 @@ class Workflow:
         self.conversational = ConversationalAgent()
         self.plan = PlanningAgent(providers, max_sub_questions)
         self.hyde = HyDEAgent(providers)
-        self.retrieve = RetrievalAgent(search)
+        self.retrieve = RetrievalAgent(search, research_concurrency, research_limiter)
         self.assess = AssessmentAgent(providers)
         self.refine = RefinementAgent(search)
         self.answer = AnsweringAgent(providers, stream_answer=stream_answer)
@@ -94,7 +96,7 @@ class Workflow:
         for stage, destination in (
             ("plan", "hyde" if hyde_enabled else "retrieve"),
             ("retrieve", "assess"),
-            ("refine", "answer"),
+            ("refine", "assess"),
             ("answer", END),
             ("conversational", END),
         ):

@@ -9,11 +9,13 @@ from .nodes import (
     RetrievalAgent,
     SearchService,
 )
+from .synthesis import SynthesisAgent
 
 __all__ = [
     "Agent",
     "State",
     "AnsweringAgent",
+    "SynthesisAgent",
     "AssessmentAgent",
     "PlanningAgent",
     "RefinementAgent",

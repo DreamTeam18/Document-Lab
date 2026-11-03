@@ -8,7 +8,7 @@ import pytest
 from app.agents.triage import TriageAgent
 from app.providers import ProviderError
 from app.workflow import Workflow
-from tests.test_core import FakeSearch, hit
+from tests.test_core import FakeSearch, assessment_fixture, hit
 
 
 class Provider:
@@ -23,7 +23,7 @@ class Provider:
         if system.startswith("You plan"):
             return '{"sub_questions":[{"id":"q1","question":"resolved lookup","objective":"Find supporting evidence","dependencies":[]}]}'
         if system.startswith("Check whether"):
-            return '{"sufficient":true}'
+            return assessment_fixture('{"sufficient":true}', prompt)
         return "Blue [1]"
 
     async def embed(self, query):

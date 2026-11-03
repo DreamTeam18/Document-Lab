@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app):
     config = settings()
     app.state.storage = None
+    app.state.research_limiter = asyncio.Semaphore(config.research_service_concurrency)
     async with httpx.AsyncClient(timeout=45) as client:
         app.state.providers = Providers(config, client)
         if config.database_url.get_secret_value():
@@ -146,6 +147,8 @@ async def query(body: Query, request: Request, store=Depends(storage)):
             timeout_seconds=config.request_timeout_seconds,
             max_sub_questions=config.max_sub_questions,
             hyde_enabled=config.hyde_enabled,
+            research_concurrency=config.research_concurrency,
+            research_limiter=request.app.state.research_limiter,
             chat_call_limit=config.chat_call_limit,
             embedding_call_limit=config.embedding_call_limit,
         )

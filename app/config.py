@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(default=768, ge=768, le=768)
     cors_origin: str = ""
     web_frontend_url: str = "http://localhost:3001"
+    research_concurrency: int = Field(default=2, ge=1, le=4)
+    research_service_concurrency: int = Field(default=2, ge=1, le=8)
     hyde_enabled: bool = False
     max_sub_questions: int = Field(default=2, ge=1, le=4)
     chat_call_limit: int = Field(default=6, ge=1, le=12)

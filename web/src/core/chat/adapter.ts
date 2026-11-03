@@ -64,6 +64,8 @@ export const chatAdapter: ChatAdapter = {
     let complete = false;
     let streamed = false;
     const labels: Record<string, string> = {
+      triage: "Request routed",
+      conversational: "Response prepared",
       plan: "Search planned",
       retrieve: "Evidence retrieved",
       assess: "Evidence checked",

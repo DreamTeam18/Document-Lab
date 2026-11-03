@@ -108,6 +108,8 @@ class FakeProvider:
         self.fail_embedding = fail_embedding
 
     async def chat(self, *args):
+        if args[0].startswith("Classify document"):
+            return '{"route":"complex_research","rewritten_question":"q"}'
         self.calls += 1
         return next(self.replies)
 

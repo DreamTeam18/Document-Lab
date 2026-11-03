@@ -30,8 +30,11 @@ Local normalized JSON / sample graph export
   -> local ingestion -> embeddings -> PostgreSQL transaction
 ```
 
-There are at most three chat-generation calls and three embedding calls per
-question (two planned searches plus one refinement). No autonomous retry loop.
+A successful first attempt uses at most four chat-generation calls and three
+embedding calls (two planned searches plus one refinement). Recovery allows at
+most two extra stage attempts across the request: upper bounds are six chat
+calls or seven embedding calls, depending on which stages fail. All attempts
+share the original request deadline; answer generation is never replayed.
 Embedding outages fall back to full-text and exact lookup, with a warning in the
 response. Empty evidence produces an abstention. Citation IDs are checked against
 retrieved sources; this does not prove factual correctness of every claim.
@@ -298,3 +301,63 @@ uv run --with playwright python -m scripts.check_web_streaming
 Requires the frontend on port 3001. Checks visible incremental output before stream
 closure, final-answer replacement without duplication, citations, and settled controls.
 Results and a screenshot are saved under `.local/web-streaming*`.
+
+## Workflow agent organization
+
+`app/workflow.py` assembles the graph; `app/agents/nodes.py` contains callable
+planning, retrieval, assessment, refinement and answering agents. Dependencies
+are injected through the provider/storage protocols in `app/agents/contracts.py`.
+Each agent returns a typed state patch without mutating request state. The shared
+search service retains the existing embedding-failure fallback. Agent failures
+propagate to a graph boundary that routes them through the dedicated error handler;
+cancellation always propagates to the caller.
+
+The original node names, prompts, retrieval limits, citation handling and public SSE
+event types are preserved. Graph edges now explicitly route failures for recovery. Conversation persistence remains in PostgreSQL; the graph
+has no process-local checkpointer. Agent isolation and exception contracts are
+covered by `uv run pytest -q tests/test_agents.py`.
+
+## Workflow failure recovery
+
+Every execution stage routes sanitized failures to `error_handler`. Transient
+OpenRouter/Pinecone HTTP failures (408, 429, 500, 502, 503, 504) and network/timeouts
+can retry triage, planning, retrieval, assessment or refinement. The entire request shares
+two additional attempts with 0.25s/0.5s backoff and its original chat deadline.
+Authentication/configuration errors, malformed provider responses, SQL failures
+and unexpected internal failures terminate without retry. Malformed assessment
+output fails explicitly instead of silently treating evidence as sufficient.
+Malformed plans retain the original single-question fallback; embedding failures
+retain exact/full-text retrieval with a warning.
+
+Answer generation is never replayed, even before the first token. Failed graphs
+end with an explicit failed status, emit SSE `error`, and do not save a completed
+turn or emit `result`. SQL version conflicts occur outside graph recovery and never
+rerun generation. Cancellation propagates through nodes and backoff; closing a
+provider connection does not guarantee every upstream provider stops billing.
+Logs contain only stage, failure code and elapsed time, never provider bodies.
+
+Run `uv run pytest -q tests/test_recovery.py tests/test_streaming.py tests/test_deep.py`
+for failure routing, retry budgets, API persistence, cancellation and streaming
+regressions. These tests mock external services and do not spend model credits.
+
+## Entry routing
+
+Requests enter `triage` before research. Exact greetings/thanks and basic help or
+context-free ambiguous prompts return fixed conversational/clarification responses
+with empty citations and no model or retrieval calls. Selected documents are still
+required by the API and UI. These responses are saved as successful turns.
+
+Simple explicit section/table lookups skip classification and planning. Other
+questions use one bounded OpenRouter classification call with a locally validated
+route/rewrite schema. Single factual lookups go to retrieval; complex requests go
+to planning. Recent history is capped at 6,000 characters, used only to resolve
+follow-ups. Original questions and selected document IDs remain unchanged.
+Invalid classifications or rewrites that drop numeric references fall back to
+planning. A model classification alone can never authorize an evidence-free answer.
+No model reasoning or arbitrary direct response is sent to the client.
+
+Routing saves calls for greetings and explicit lookups, but adds one call for
+complex research; it is not a universal latency improvement. Direct conversational
+responses emit progress and a final result without token events. Research answers
+retain live token streaming. `tests/test_triage.py` covers routes, call counts,
+unsafe classifications, history bounds, recovery and API persistence.

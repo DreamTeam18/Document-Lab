@@ -7,7 +7,17 @@ from app.config import Settings
 
 
 class ProviderError(Exception):
-    """Public-safe upstream failure; never includes keys, URLs, or response bodies."""
+    """Public-safe upstream failure with conservative retry classification."""
+
+    def __init__(self, message: str, *, retryable: bool = False):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+def transient_http_error(error: httpx.HTTPError) -> bool:
+    if isinstance(error, httpx.HTTPStatusError):
+        return error.response.status_code in {408, 429, 500, 502, 503, 504}
+    return isinstance(error, (httpx.TimeoutException, httpx.NetworkError))
 
 
 def vector_literal(values: list[float], dimensions: int = 768) -> str:
@@ -31,8 +41,12 @@ class Providers:
             if "error" in body:
                 raise ProviderError("Model provider rejected the request")
             return body
-        except (httpx.HTTPError, ValueError) as exc:
-            raise ProviderError("Model provider unavailable or rate-limited") from exc
+        except httpx.HTTPError as exc:
+            raise ProviderError(
+                "Model provider unavailable or rate-limited", retryable=transient_http_error(exc)
+            ) from None
+        except ValueError:
+            raise ProviderError("Model provider returned an invalid response") from None
 
     async def chat(self, system: str, prompt: str, max_tokens: int = 1200) -> str:
         if not self.config.openrouter_api_key.get_secret_value():

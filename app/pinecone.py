@@ -5,7 +5,7 @@ import re
 
 import httpx
 
-from app.providers import ProviderError, vector_literal
+from app.providers import ProviderError, transient_http_error, vector_literal
 
 
 class PineconeVectors:
@@ -23,7 +23,12 @@ class PineconeVectors:
             )
             response.raise_for_status()
             return response.json()
-        except (httpx.HTTPError, ValueError):
+        except httpx.HTTPError as exc:
+            raise ProviderError(
+                "Pinecone request failed; check connectivity and index configuration",
+                retryable=transient_http_error(exc),
+            ) from None
+        except ValueError:
             raise ProviderError(
                 "Pinecone request failed; check connectivity and index configuration"
             ) from None

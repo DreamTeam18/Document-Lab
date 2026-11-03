@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import UUID
@@ -138,12 +139,18 @@ async def query(body: Query, request: Request, store=Depends(storage)):
 
     async def stream():
         yield event("session", {"thread_id": thread_id})
-        workflow = Workflow(request.app.state.providers, store, stream_answer=True)
+        workflow = Workflow(
+            request.app.state.providers,
+            store,
+            stream_answer=True,
+            timeout_seconds=config.request_timeout_seconds,
+        )
         final = {}
         try:
             async with asyncio.timeout(config.request_timeout_seconds):
                 async for mode, update in workflow.graph.astream(
                     {
+                        "deadline": time.monotonic() + config.request_timeout_seconds,
                         "question": body.user_query,
                         "document_ids": body.document_ids,
                         "history": recent_context(history, config.history_max_chars),
@@ -155,7 +162,25 @@ async def query(body: Query, request: Request, store=Depends(storage)):
                         continue
                     for step, values in update.items():
                         final.update(values)
-                        yield event("progress", {"step": step, "status": "completed"})
+                        status = values.get("status")
+                        yield event(
+                            "progress",
+                            {
+                                "step": step,
+                                "status": "failed"
+                                if status in {"recovering", "failed"}
+                                else "completed",
+                            },
+                        )
+                if final.get("status") != "succeeded":
+                    failure = final.get("failure") or {}
+                    message = (
+                        "Request timed out; retry with a narrower question."
+                        if failure.get("code") == "deadline_exceeded"
+                        else "Request failed. Please retry or check backend configuration."
+                    )
+                    yield event("error", {"message": message})
+                    return
                 await store.save_turn(
                     thread_id, version, body.user_query, final["answer"], final["citations"]
                 )

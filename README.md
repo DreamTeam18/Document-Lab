@@ -530,3 +530,11 @@ uv run --with playwright python -m scripts.check_web_research
 ```
 The browser regression uses mocked documents, health and SSE responses; it
 requires the current frontend build on port 3001 and uses no provider credits.
+
+## Research validation (#5 and #6)
+
+The [recorded concurrency benchmark and live assessment evaluation](docs/validation/research-validation.md)
+include methodology, fixed synthetic cases, measured results and limitations.
+Run `uv run python -m scripts.validate_research` for the offline concurrency benchmark;
+add `--live-assessment` to explicitly use the configured OpenRouter model for the
+12-case assessment evaluation. The Builder.ai golden dataset remains separate work.

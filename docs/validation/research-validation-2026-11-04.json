@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-11-04T17:20:54.843519+00:00",
+  "python": "3.12.12",
+  "platform": "macOS-15.7.3-x86_64-i386-64bit",
+  "commit": "c80592176a8f91d56626716958df67c47f9e25d0",
+  "working_tree_dirty": true,
+  "concurrency": {
+    "1": {
+      "runs": 10,
+      "median_ms": 206.055,
+      "min_ms": 203.587,
+      "max_ms": 209.513,
+      "speedup": 1.0,
+      "observed_peaks": [
+        1
+      ]
+    },
+    "2": {
+      "runs": 10,
+      "median_ms": 103.483,
+      "min_ms": 101.94,
+      "max_ms": 104.879,
+      "speedup": 1.991,
+      "observed_peaks": [
+        2
+      ]
+    },
+    "4": {
+      "runs": 10,
+      "median_ms": 82.523,
+      "min_ms": 81.306,
+      "max_ms": 82.596,
+      "speedup": 2.497,
+      "observed_peaks": [
+        4
+      ]
+    }
+  },
+  "assessment": {
+    "model": "openai/gpt-oss-120b",
+    "temperature": 0,
+    "cases": [
+      {
+        "id": "direct",
+        "expected": "sufficient",
+        "actual": "sufficient",
+        "evidence_match": true,
+        "seconds": 1.818
+      },
+      {
+        "id": "paraphrase",
+        "expected": "sufficient",
+        "actual": "sufficient",
+        "evidence_match": true,
+        "seconds": 1.07
+      },
+      {
+        "id": "qualification",
+        "expected": "sufficient",
+        "actual": "sufficient",
+        "evidence_match": true,
+        "seconds": 1.706
+      },
+      {
+        "id": "combined",
+        "expected": "sufficient",
+        "actual": "sufficient",
+        "evidence_match": true,
+        "seconds": 1.996
+      },
+      {
+        "id": "missing-owner",
+        "expected": "partial",
+        "actual": "partial",
+        "evidence_match": true,
+        "seconds": 1.791
+      },
+      {
+        "id": "conflict",
+        "expected": "partial",
+        "actual": "partial",
+        "evidence_match": true,
+        "seconds": 1.19
+      },
+      {
+        "id": "missing-condition",
+        "expected": "partial",
+        "actual": "partial",
+        "evidence_match": true,
+        "seconds": 1.421
+      },
+      {
+        "id": "missing-date",
+        "expected": "partial",
+        "actual": "partial",
+        "evidence_match": true,
+        "seconds": 3.705
+      },
+      {
+        "id": "irrelevant",
+        "expected": "none",
+        "actual": "none",
+        "evidence_match": true,
+        "seconds": 1.128
+      },
+      {
+        "id": "absent",
+        "expected": "none",
+        "actual": "none",
+        "evidence_match": true,
+        "seconds": 0.0
+      },
+      {
+        "id": "wrong-scope",
+        "expected": "none",
+        "actual": "none",
+        "evidence_match": true,
+        "seconds": 1.11
+      },
+      {
+        "id": "injection",
+        "expected": "none",
+        "actual": "none",
+        "evidence_match": true,
+        "seconds": 3.395
+      }
+    ],
+    "metrics": {
+      "status_accuracy": {
+        "count": 12,
+        "denominator": 12,
+        "rate": 1.0
+      },
+      "false_sufficient": {
+        "count": 0,
+        "denominator": 8,
+        "rate": 0.0
+      },
+      "false_insufficient": {
+        "count": 0,
+        "denominator": 4,
+        "rate": 0.0
+      },
+      "errors": 0,
+      "evidence_set_accuracy": {
+        "count": 12,
+        "denominator": 12,
+        "rate": 1.0
+      }
+    },
+    "max_model_calls": 11,
+    "dataset_sha256": "f8051476c9d520bbe4055c4e752e263874b773f2011f05553a256a9203b1a521"
+  }
+}

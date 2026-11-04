@@ -1,4 +1,5 @@
-export type Citation = {
+export type DocumentCitation = {
+  source_type?: "document";
   citation: number;
   document_id: string;
   document_title: string;
@@ -7,6 +8,15 @@ export type Citation = {
   kind: string;
   page?: number;
 };
+export type WebCitation = {
+  source_type: "web";
+  citation: number;
+  title: string;
+  url: string;
+  retrieved_at: string;
+  published_date?: string;
+};
+export type Citation = DocumentCitation | WebCitation;
 export type ChatMode = "flash" | "thinking" | "pro" | "ultra";
 
 export type ChatStepKind = "search" | "fetch" | "bash" | "write";
@@ -37,6 +47,9 @@ export type AssistantMessage = {
   id: string;
   role: "assistant";
   reasoning: string;
+  webRequested?: boolean;
+  persistedAnswer?: string;
+  persistedCitations?: Citation[];
   citations?: Citation[];
   warnings?: string[];
   error?: string;
@@ -65,6 +78,7 @@ export type ChatSettings = {
 
 /** One increment of an assistant turn. A backend maps its stream onto these. */
 export type ChatEvent =
+  | { type: "persistence"; text: string; citations: Citation[] }
   | { type: "session"; serverThreadId: string }
   | { type: "sources"; citations: Citation[]; warnings: string[] }
   | { type: "title"; title: string }

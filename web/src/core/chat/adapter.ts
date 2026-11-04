@@ -73,6 +73,7 @@ export const chatAdapter: ChatAdapter = {
       refine: "Search refined",
       answer: "Answer prepared",
       error_handler: "Recovery handled",
+      web: "Web search and evidence assessment completed",
     };
     for await (const { event, data } of parseSSE(response.body)) {
       if (event === "session")
@@ -94,6 +95,8 @@ export const chatAdapter: ChatAdapter = {
       if (event === "error") throw new Error(data.message || "Query failed.");
       if (event === "result") {
         complete = true;
+        if (typeof data.persisted_answer === "string")
+          yield { type: "persistence", text: data.persisted_answer, citations: data.persisted_citations || [] };
         // Final validated text is authoritative: replace drafts, never append twice.
         if (streamed) yield { type: "text-replace", text: data.answer };
         else yield { type: "text", delta: data.answer };

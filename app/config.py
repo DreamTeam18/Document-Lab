@@ -8,6 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    tavily_key: SecretStr = SecretStr("")
+    tavily_include_domains: list[str] = Field(default_factory=list, max_length=20)
+
     vector_backend: Literal["pgvector", "pinecone"] = "pgvector"
     pinecone_key: SecretStr = SecretStr("")
     pinecone_index: str = Field(default="agentic-rag", pattern=r"^[a-z0-9][a-z0-9-]{0,44}$")

@@ -21,3 +21,21 @@ it('renders provided welcome header',()=>{setup({extraHeader:<h2>Choose your sou
 it('file paste directs user to indexed upload',()=>{const {box,props}=setup();fireEvent.paste(box,{clipboardData:{files:[new File(['x'],'x.txt')]}});expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('Upload document'));expect(props.onSubmit).not.toHaveBeenCalled()});
 it('file drop directs user to sidebar rather than silently attaching',()=>{const {box}=setup();fireEvent.drop(box,{dataTransfer:{files:[new File(['x'],'x.txt')],types:['Files']}});expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('index files'))});
 it('Shift+Enter inserts newline without submitting',async()=>{const {box,props}=setup();await userEvent.type(box,'Line one');await userEvent.keyboard('{Shift>}{Enter}{/Shift}Line two');expect(props.onSubmit).not.toHaveBeenCalled();expect(box).toHaveValue('Line one\nLine two')});
+
+it('explains automatic fallback without a web checkbox or query field',()=>{
+ setup({webAvailable:true});
+ expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+ expect(screen.queryByRole('textbox',{name:'Public search queries'})).not.toBeInTheDocument();
+ expect(screen.getByText(/When documents lack evidence/)).toBeVisible();
+});
+it('automatic fallback needs only the normal question',async()=>{
+ const {box,props}=setup({webAvailable:true});
+ fireEvent.change(box,{target:{value:'Compare my documents'}});
+ fireEvent.submit(box.closest('form')!);
+ await waitFor(()=>expect(props.onSubmit).toHaveBeenCalledWith('Compare my documents',[]));
+});
+it('unavailable web search leaves document input usable',()=>{
+ const {box}=setup({webAvailable:false});
+ expect(box).not.toBeDisabled();
+ expect(screen.getByText(/Web search is unavailable/)).toBeVisible();
+});

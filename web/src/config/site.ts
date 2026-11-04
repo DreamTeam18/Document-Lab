@@ -81,7 +81,7 @@ export const site = {
         label: "Transparency",
         title: "Know the limits",
         description:
-          "Evidence is checked for each question. A focused follow-up search can fill gaps; unresolved gaps and failed searches are reported.",
+          "Evidence is checked for each question. When document evidence is insufficient, web search adds separately labeled external findings.",
       },
       {
         label: "Your workspace",
@@ -99,7 +99,7 @@ export const site = {
   chat: {
     greeting: "What would you like to understand?",
     description:
-      "Upload or select documents, then ask a question or compare details. Follow the search progress, streamed answer, and cited sources.",
+      "Select documents and ask a question. When document evidence is insufficient, web search runs automatically. Document and web findings are labeled separately.",
     placeholder: "Ask a question about your documents…",
     disclaimer: "Answers can make mistakes. Check the cited sources.",
     surpriseMe: {

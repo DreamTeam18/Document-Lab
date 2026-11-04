@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { site } from "@/config/site";
 
+import { persistedThread } from "./privacy";
 import { chatAdapter } from "./adapter";
 
 import {
@@ -41,6 +42,7 @@ type SendInput = {
 type ChatStore = {
   /** False until browser storage has been read, on the client only. */
   ready: boolean;
+  webAvailable: boolean | null;
   documents: { id: string; title: string; edition: string }[];
   selectedIds: string[];
   setSelectedIds: (ids: string[]) => void;
@@ -98,6 +100,7 @@ function settleInterruptedTurn(thread: ChatThread): ChatThread {
 }
 
 export function ChatStoreProvider({ children }: { children: ReactNode }) {
+  const [webAvailable, setWebAvailable] = useState<boolean | null>(null);
   const [ready, setReady] = useState(false);
   const [documents, setDocuments] = useState<
     { id: string; title: string; edition: string }[]
@@ -121,6 +124,9 @@ export function ChatStoreProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     void refreshDocuments();
+    void fetch("/api/rag/health", { signal: AbortSignal.timeout(10000) })
+      .then(r => r.json()).then(data => setWebAvailable(data.web_available === true))
+      .catch(() => setWebAvailable(null));
   }, [refreshDocuments]);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -143,7 +149,7 @@ export function ChatStoreProvider({ children }: { children: ReactNode }) {
   // Saved between turns rather than on every streamed token.
   useEffect(() => {
     if (ready && streamingIds.size === 0) {
-      writeJson(THREADS_KEY, threads);
+      writeJson(THREADS_KEY, threads.map(persistedThread));
     }
   }, [ready, streamingIds, threads]);
 
@@ -284,6 +290,7 @@ export function ChatStoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       ready,
+      webAvailable,
       documents,
       selectedIds,
       setSelectedIds,
@@ -298,6 +305,7 @@ export function ChatStoreProvider({ children }: { children: ReactNode }) {
     }),
     [
       ready,
+      webAvailable,
       threads,
       settings,
       isStreaming,

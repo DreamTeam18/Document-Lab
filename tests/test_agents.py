@@ -75,6 +75,8 @@ def agent(name, provider, storage):
                 "retry",
                 "searches",
                 "assessments",
+                "web_requested",
+                "web_queries",
                 "refinement_target",
                 "warnings",
                 "context",

@@ -23,6 +23,7 @@ export function Composer({
   isStreaming,
   disabled,
   settings,
+  webAvailable,
   extraHeader,
   onSettingsChange,
   onSubmit,
@@ -33,6 +34,7 @@ export function Composer({
   isStreaming: boolean;
   disabled?: boolean;
   settings: ChatSettings;
+  webAvailable?: boolean | null;
   extraHeader?: React.ReactNode;
   onSettingsChange: (settings: ChatSettings) => void;
   onSubmit: (text: string, files: File[]) => void;
@@ -119,6 +121,11 @@ export function Composer({
             placeholder={site.chat.placeholder}
           />
         </div>
+        <p className="px-4 pb-2 text-xs text-muted-foreground">
+          {webAvailable === false
+            ? "Web search is unavailable. Document search still works."
+            : "When documents lack evidence, your question is used to search the web. Document and web findings are shown separately. Web answers and links are not saved."}
+        </p>
         <PromptInputFooter className="flex flex-wrap gap-2 sm:flex-nowrap">
           <PromptInputTools className="min-w-0 flex-1 flex-wrap">
             <span className="text-muted-foreground px-2 text-xs">

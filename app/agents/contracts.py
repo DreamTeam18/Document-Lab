@@ -25,6 +25,11 @@ class ResearchQuestion(TypedDict):
 
 
 class State(TypedDict, total=False):
+    web_requested: bool
+    web_queries: list[str]
+    web_results: list[dict]
+    document_answer: str
+
     assessments: list[dict]
     refinement_target: str | None
     refinement_attempts: int

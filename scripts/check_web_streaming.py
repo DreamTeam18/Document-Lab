@@ -50,7 +50,7 @@ def main():
             };
         })();""")
         page.goto(BASE + "/workspace/chats/new", wait_until="networkidle")
-        page.get_by_role("checkbox").check()
+        page.get_by_role("checkbox").first.check()
         page.get_by_role("textbox", name="Message", exact=True).fill("Explain the label rule.")
         page.get_by_role("button", name="Send", exact=True).click()
         page.wait_for_function("typeof window.sendTestEvent === 'function'")
@@ -59,6 +59,15 @@ def main():
             page.evaluate("([event,data]) => window.sendTestEvent(event,data)", [event, data])
 
         send("session", {"thread_id": "22222222-2222-4222-8222-222222222222"})
+        send("progress", {"step": "assess", "status": "failed"})
+        expect(page.get_by_text("Evidence checked — failed", exact=True)).to_be_visible()
+        checks.append("Failed backend stage is displayed as failed")
+        send("progress", {"step": "error_handler", "status": "completed"})
+        expect(page.get_by_text("Recovery handled", exact=True)).to_be_visible()
+        send("progress", {"step": "assess", "status": "completed"})
+        expect(page.get_by_text("Evidence checked — failed", exact=True)).to_have_count(0)
+        expect(page.get_by_text("Evidence checked", exact=True)).to_have_count(1)
+        checks.append("Recovery and reassessment update the existing stage")
         send("token", {"delta": "Streaming draft"})
         expect(page.get_by_text("Streaming draft", exact=True)).to_be_visible()
         expect(page.get_by_role("button", name="Stop", exact=True)).to_be_visible()
@@ -72,6 +81,9 @@ def main():
             "result",
             {
                 "answer": "**Validated answer** replaces the draft. [1]",
+                "warnings": ["Evidence partial for q2."],
+                "usage": {"chat_calls": 5},
+                "plan_size": 2,
                 "citations": [
                     {
                         "citation": 1,
@@ -94,6 +106,23 @@ def main():
         page.get_by_text("[1] Streaming test manual · Page 3", exact=True).click()
         expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0)
         checks.append("Final citations are interactive and streaming controls settle")
+        expect(page.get_by_text("Evidence partial for q2.", exact=True)).to_be_visible()
+        checks.append("Per-question evidence warning is visible beside the answer")
+        page.get_by_role("textbox", name="Message", exact=True).fill("Follow-up failure")
+        page.get_by_role("button", name="Send", exact=True).click()
+        expect(page.get_by_role("button", name="Stop", exact=True)).to_be_visible()
+        send("token", {"delta": "Unfinished response"})
+        expect(page.get_by_text("Unfinished response", exact=True)).to_be_visible()
+        send("progress", {"step": "answer", "status": "failed"})
+        send("error", {"message": "Request call budget exhausted; retry with a narrower question."})
+        expect(page.get_by_text("Answer prepared — failed", exact=True)).to_be_visible()
+        expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0)
+        expect(
+            page.get_by_text(
+                "Request call budget exhausted; retry with a narrower question.", exact=True
+            ).first
+        ).to_be_visible()
+        checks.append("Late stream failure preserves failed progress and settles controls")
         assert not errors, errors
         checks.append("No browser runtime errors")
         Path(".local").mkdir(exist_ok=True)

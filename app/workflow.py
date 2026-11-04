@@ -27,6 +27,7 @@ from app.agents.evidence import (
 from app.agents.hyde import HyDEAgent
 from app.agents.recovery import ErrorHandlerAgent, GuardedAgent
 from app.agents.triage import ConversationalAgent, TriageAgent
+from app.agents.web import WebResearchAgent
 
 
 class Workflow:
@@ -40,6 +41,7 @@ class Workflow:
         max_sub_questions: int = 2,
         hyde_enabled: bool = False,
         research_concurrency: int = 2,
+        web_client=None,
         research_limiter=None,
         chat_call_limit: int = 6,
         embedding_call_limit: int = 13,
@@ -53,11 +55,21 @@ class Workflow:
         self.plan = PlanningAgent(providers, max_sub_questions)
         self.hyde = HyDEAgent(providers)
         self.retrieve = RetrievalAgent(search, research_concurrency, research_limiter)
-        self.assess = AssessmentAgent(providers)
+        self.assess = AssessmentAgent(providers, web_fallback=web_client is not None)
         self.refine = RefinementAgent(search)
+        self.web = WebResearchAgent(web_client, providers)
         self.answer = AnsweringAgent(providers, stream_answer=stream_answer)
         graph = StateGraph(State)
-        names = ["triage", "conversational", "plan", "retrieve", "assess", "refine", "answer"]
+        names = [
+            "web",
+            "triage",
+            "conversational",
+            "plan",
+            "retrieve",
+            "assess",
+            "refine",
+            "answer",
+        ]
         if hyde_enabled:
             names.append("hyde")
         for name in names:
@@ -97,6 +109,7 @@ class Workflow:
             ("plan", "hyde" if hyde_enabled else "retrieve"),
             ("retrieve", "assess"),
             ("refine", "assess"),
+            ("web", "answer"),
             ("answer", END),
             ("conversational", END),
         ):
@@ -112,9 +125,15 @@ class Workflow:
             lambda state: (
                 "error_handler"
                 if state.get("failure")
-                else ("refine" if state["retry"] else "answer")
+                else (
+                    "refine"
+                    if state["retry"]
+                    else "web"
+                    if state.get("web_requested")
+                    else "answer"
+                )
             ),
-            {name: name for name in ("error_handler", "refine", "answer")},
+            {name: name for name in ("error_handler", "refine", "answer", "web")},
         )
         graph.add_conditional_edges(
             "error_handler",

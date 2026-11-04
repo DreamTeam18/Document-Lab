@@ -33,6 +33,7 @@ class GuardedAgent:
             self.embedding_limit,
             previous.get("chat_calls", 0),
             previous.get("embedding_calls", 0),
+            previous.get("web_calls", 0),
         )
         token = current_budget.set(budget)
         try:

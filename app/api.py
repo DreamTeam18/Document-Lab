@@ -16,9 +16,11 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.models import Query
 from app.pinecone import PineconeVectors
+from app.privacy import safe_turn
 from app.providers import ProviderError, Providers
 from app.storage import Conflict, NotFound, Storage, recent_context
 from app.uploads import MAX_BYTES, extract_document
+from app.web_search import TavilySearch
 from app.workflow import Workflow
 from scripts.ingest import ingest
 
@@ -32,6 +34,9 @@ async def lifespan(app):
     app.state.research_limiter = asyncio.Semaphore(config.research_service_concurrency)
     async with httpx.AsyncClient(timeout=45) as client:
         app.state.providers = Providers(config, client)
+        app.state.web_search = TavilySearch(
+            config.tavily_key.get_secret_value(), client, config.tavily_include_domains
+        )
         if config.database_url.get_secret_value():
             vectors = (
                 PineconeVectors(config, client) if config.vector_backend == "pinecone" else None
@@ -98,7 +103,11 @@ def storage(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "agentic-rag-clone"}
+    return {
+        "status": "ok",
+        "service": "agentic-rag-clone",
+        "web_available": bool(settings().tavily_key.get_secret_value()),
+    }
 
 
 @app.get("/documents")
@@ -144,6 +153,7 @@ async def query(body: Query, request: Request, store=Depends(storage)):
             request.app.state.providers,
             store,
             stream_answer=True,
+            web_client=getattr(request.app.state, "web_search", None),
             timeout_seconds=config.request_timeout_seconds,
             max_sub_questions=config.max_sub_questions,
             hyde_enabled=config.hyde_enabled,
@@ -190,8 +200,14 @@ async def query(body: Query, request: Request, store=Depends(storage)):
                         message = "Request call budget exhausted; retry with a narrower question."
                     yield event("error", {"message": message, "usage": final.get("usage", {})})
                     return
+                saved_question, saved_answer, saved_citations = safe_turn(
+                    body.user_query,
+                    final["answer"],
+                    final["citations"],
+                    final.get("document_answer"),
+                )
                 await store.save_turn(
-                    thread_id, version, body.user_query, final["answer"], final["citations"]
+                    thread_id, version, saved_question, saved_answer, saved_citations
                 )
                 yield event(
                     "result",
@@ -202,6 +218,14 @@ async def query(body: Query, request: Request, store=Depends(storage)):
                         "warnings": list(dict.fromkeys(final.get("warnings", []))),
                         "usage": final.get("usage", {}),
                         "plan_size": final.get("plan_size", 0),
+                        **(
+                            {
+                                "persisted_answer": saved_answer,
+                                "persisted_citations": saved_citations,
+                            }
+                            if final.get("web_requested")
+                            else {}
+                        ),
                     },
                 )
         except TimeoutError:

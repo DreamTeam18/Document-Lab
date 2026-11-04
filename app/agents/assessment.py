@@ -36,6 +36,7 @@ def unresolved(id, status, reason):
 @dataclass(frozen=True)
 class AssessmentAgent:
     providers: Provider
+    web_fallback: bool = False
 
     async def __call__(self, state: State) -> State:
         plan = state.get("research_plan") or single_question_plan(
@@ -145,7 +146,7 @@ class AssessmentAgent:
             target
             and budget
             and (
-                budget.chat_limit - budget.chat_calls < 2
+                budget.chat_limit - budget.chat_calls < (5 if self.web_fallback else 2)
                 or budget.embedding_limit - budget.embedding_calls < 1
             )
         ):
@@ -160,7 +161,16 @@ class AssessmentAgent:
         context, sources = prepare_evidence(
             [h for h in state.get("hits", []) if h["id"] in supported]
         )
+        # Only validated coverage gaps trigger external research, not evaluator failures.
+        use_web = (
+            self.web_fallback
+            and target is None
+            and any(a["status"] in {"partial", "none"} for a in assessments)
+        )
         return {
+            "web_requested": use_web,
+            # Send the user's question only, never excerpts, history or evaluator-generated text.
+            "web_queries": [state["question"][:300]] if use_web else [],
             "context": context,
             "sources": sources,
             "assessments": assessments,

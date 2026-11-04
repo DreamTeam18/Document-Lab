@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 import { CopyButton } from "./copy-button";
 import { MessageReasoning } from "./message-reasoning";
+import { safeWebUrl } from "@/core/chat/privacy";
 import { MessageSteps } from "./message-steps";
 import { StreamingIndicator } from "./streaming-indicator";
 
@@ -137,7 +138,15 @@ function AssistantRow({ message }: { message: AssistantMessage }) {
         )}
         {message.citations && message.citations.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-2" aria-label="Sources">
-            {message.citations.map((c) => (
+            {message.citations.map((c) => c.source_type === "web" ? (
+              <div key={c.citation} className="bg-secondary/50 max-w-full rounded-lg border px-3 py-2 text-xs">
+                <span>Web · [{c.citation}] </span>
+                {safeWebUrl(c.url) ? <a href={c.url} target="_blank" rel="noopener noreferrer"
+                  className="underline break-all">{c.title} · {new URL(c.url).hostname}</a> : <span>Unavailable web link</span>}
+                {c.published_date && <p>Published: {c.published_date}</p>}
+                <p>Web links are not retained after reload.</p>
+              </div>
+            ) : (
               <details
                 key={c.citation}
                 className="bg-secondary/50 max-w-full rounded-lg border px-3 py-2 text-xs"

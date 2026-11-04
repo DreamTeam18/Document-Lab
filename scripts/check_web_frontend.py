@@ -10,6 +10,7 @@ BASE = "http://127.0.0.1:3001"
 
 def main():
     checks = []
+    Path(".local").mkdir(exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -17,6 +18,18 @@ def main():
             args=["--enable-unsafe-swiftshader"],
         )
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page.route(
+            "**/api/rag/documents",
+            lambda route: route.fulfill(
+                json=[
+                    {
+                        "id": "11111111-1111-4111-8111-111111111111",
+                        "title": "Test manual",
+                        "edition": "v1",
+                    }
+                ]
+            ),
+        )
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(BASE, wait_until="networkidle")
@@ -27,7 +40,9 @@ def main():
         page.screenshot(path=".local/web-landing-desktop.png")
         page.get_by_role("tab", name="Connect the details").click()
         page.get_by_role("button", name="Answer", exact=True).click()
-        page.get_by_text("Complete orientation, then ask your team lead", exact=False).wait_for()
+        page.get_by_text(
+            "Complete orientation and obtain your team lead’s approval", exact=False
+        ).wait_for()
         page.wait_for_timeout(400)
         page.screenshot(path=".local/web-examples-desktop.png")
         checks.append("Interactive example tabs, stage selection and pause")
@@ -35,7 +50,7 @@ def main():
         page.locator("input[type=checkbox]").first.wait_for()
         assert page.get_by_role("button", name="Send", exact=True).is_disabled()
         page.locator("input[type=checkbox]").first.check()
-        checks.append("Real document API via proxy; sending requires selection")
+        checks.append("Mocked document list; sending requires selection")
         with page.expect_file_chooser():
             page.get_by_role("button", name="Upload document", exact=True).click()
         checks.append("Native file chooser")

@@ -17,6 +17,13 @@ class CallBudget:
     chat_calls: int = 0
     embedding_calls: int = 0
 
+    web_calls: int = 0
+
+    def consume_web(self):
+        if self.web_calls >= 2:
+            raise BudgetExceeded("Web search limit reached")
+        self.web_calls += 1
+
     def consume(self, kind):
         field, limit = (
             ("chat_calls", self.chat_limit)
@@ -30,6 +37,7 @@ class CallBudget:
 
     def snapshot(self):
         return {
+            **({"web_calls": self.web_calls, "web_limit": 2} if self.web_calls else {}),
             "chat_calls": self.chat_calls,
             "embedding_calls": self.embedding_calls,
             "chat_limit": self.chat_limit,

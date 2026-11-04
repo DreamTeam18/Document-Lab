@@ -67,3 +67,14 @@ it('keeps global synthesis citations and partial evidence warnings with final re
  expect(events).toContainEqual({type:'text-replace',text:'Supported [2]'});
  expect(events).toContainEqual({type:'sources',citations,warnings:['Evidence partial for q2.']});
 });
+
+it('accepts automatic fallback persistence without client web flags',async()=>{
+ mock(frame('result',{answer:'Both sections',persisted_answer:'Document section only',persisted_citations:[]}));
+ const events=await run(request());
+ expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).not.toHaveProperty('web_requested');
+ expect(events).toContainEqual({type:'persistence',text:'Document section only',citations:[]});
+});
+it('maps web progress without treating it as answer text',async()=>{
+ mock(frame('progress',{step:'web',status:'completed'})+frame('result',{answer:'Answer'}));
+ expect((await run())[0]).toMatchObject({type:'step',step:{label:'Web search and evidence assessment completed'}});
+});

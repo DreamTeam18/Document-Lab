@@ -476,3 +476,57 @@ Run focused checks with:
 ```sh
 uv run pytest -q tests/test_assessment.py tests/test_synthesis.py tests/test_streaming.py
 ```
+
+## Automatic document + web research (#9)
+
+Select documents and ask a question. After document retrieval, evidence assessment
+and bounded refinement, validated partial or missing evidence triggers web search.
+Sufficient evidence, greetings, clarification and invalid assessments do not trigger
+external search. There is no checkbox or public-query input. The current question
+(first 300 characters) is sent to Tavily; document excerpts, evaluator-generated
+queries and conversation history are never sent. Web findings are external context,
+not proof of internal policies. The composer explains this automatic behavior.
+
+Set the optional server-side `TAVILY_KEY` in the local environment.
+`TAVILY_INCLUDE_DOMAINS` accepts a JSON list of allowed publishers. Without a
+key, document search works normally and the frontend shows web search as
+unavailable. Clients can check `GET /health` for `web_available`.
+
+The query API requires no web flags. Selected document IDs remain required. Tavily uses basic search, three results, no generated answer,
+no automatic parameter escalation and no raw page content. Every HTTP attempt,
+including a retry, consumes the same hard limit of two per request. Network
+requests have a 12-second timeout inside the overall workflow deadline.
+Results are capped at 128 KB and excerpts at 2,000 characters per result.
+
+Web evidence is independently assessed for each public query. The final answer
+uses **From your documents** and **From the web** sections, generated separately:
+web excerpts never enter the document-answer prompt. Invalid assessments,
+unavailable search or insufficient budgets produce explicit warnings while
+retaining document evidence. Citation-ID validation does not establish factual
+entailment. More precise query/claim-quality evaluation requires reviewed live
+cases; automated mock tests validate routing and contracts, not semantic quality.
+
+Web results are request-local and never indexed in Pinecone. To enforce the
+non-persistence boundary, the saved answer retains only the separately generated
+document answer and a notice that the web response and links were not retained.
+Web excerpts, generated web answer text and web citations are excluded from SQL
+and browser storage. URL strings are also removed from saved question/answer
+text and document citation metadata. The live response still includes typed web
+source cards. A refresh therefore loses the web section and its links; explicitly
+search again to verify external information. Interrupted web drafts are excluded
+from browser persistence and failed server generations are never saved.
+
+For automatic web-fallback turns, the final SSE result includes `persisted_answer` and
+`persisted_citations` alongside the live answer/citations. The frontend keeps
+those safe representations separate and uses them only for local persistence.
+Legacy clients should not persist live web responses.
+
+Validation:
+```sh
+uv run pytest -q tests/test_web_search.py
+npm --prefix web test
+npm --prefix web run typecheck
+uv run --with playwright python -m scripts.check_web_research
+```
+The browser regression uses mocked documents, health and SSE responses; it
+requires the current frontend build on port 3001 and uses no provider credits.

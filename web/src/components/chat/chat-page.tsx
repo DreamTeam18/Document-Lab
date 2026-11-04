@@ -27,6 +27,7 @@ export function ChatPage() {
   const routeThreadId = usePathname().split("/").pop() ?? NEW_THREAD_ID;
   const {
     ready,
+    webAvailable,
     threads,
     selectedIds,
     settings,
@@ -120,6 +121,7 @@ export function ChatPage() {
                 isStreaming={streaming}
                 isWelcomeMode={isWelcomeMode}
                 settings={settings}
+                webAvailable={webAvailable}
                 extraHeader={isWelcomeMode && <Welcome mode={settings.mode} />}
                 onSettingsChange={setSettings}
                 onStop={() => stop(routeThreadId)}

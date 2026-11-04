@@ -16,6 +16,8 @@ export function applyChatEvent(
   }
   return updateAssistantMessage(thread, messageId, (message) => {
     switch (event.type) {
+      case "persistence":
+        return { ...message, webRequested: true, persistedAnswer: event.text, persistedCitations: event.citations };
       case "sources":
         return {
           ...message,
@@ -32,6 +34,7 @@ export function applyChatEvent(
         const exists = message.steps.some((step) => step.id === event.step.id);
         return {
           ...message,
+          webRequested: message.webRequested || event.step.id === "web",
           steps: exists
             ? message.steps.map((step) =>
                 step.id === event.step.id ? event.step : step,
